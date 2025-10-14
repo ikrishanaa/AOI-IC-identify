@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # -- DATABASE --
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=aoi_db
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d aoi_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -- BACKEND SERVICES --
+  api_gateway:
+    build:
+      context: ./backend
+    command: uvicorn api_gateway.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8003:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres/aoi_db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  inspection_service:
+    build:
+      context: ./backend
+    command: uvicorn inspection_service.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres/aoi_db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  batch_worker:
+    build:
+      context: ./backend
+    command: celery -A batch_processing_service.celery_app worker --loglevel=info
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres/aoi_db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  stream_ingestion_service:
+    build:
+      context: ./backend
+    command: uvicorn stream_ingestion_service.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8002:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres/aoi_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  decision_engine:
+    build:
+      context: ./backend
+    command: uvicorn decision_engine.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8004:8000"
+
+  verification_service:
+    build:
+      context: ./backend
+    command: uvicorn verification_service.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8005:8000"
+
+# volumes:
+#   postgres_data:
