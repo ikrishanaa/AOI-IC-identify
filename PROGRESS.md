@@ -5,7 +5,7 @@ A running progress tracker for the AOI IC Marking project. Update this as milest
 Status legend: NOT STARTED | IN PROGRESS | DONE
 
 Summary
-- Compose stack is built and running; all backend services respond on /health; DB connectivity OK. Next up: M4 (enqueue + status) and M5 (decision engine v0). Frontend dev server setup pending.
+- Tooling installed (Python venv, pip, build essentials); backend tests passing. Docker Engine + Compose installed and images built. Frontend deps installed (Node 20 + npm). Next up: M4 (enqueue + status) and M5 (decision engine v0); start frontend dev server.
 
 Milestone status
 - M0 Repo bootstrap and governance: DONE
@@ -28,6 +28,7 @@ Next actions
 - M5: Implement /decide with basic weighted rules and unit tests.
 
 Changelog
+- 2025-10-16: Installed Python tooling (venv/pip/build-essential), created venv and installed deps; ran pytest (passing). Installed Docker CE + Compose plugin, enabled service; built all images via `docker compose build`. Installed Node.js 20 + npm and `npm install` in frontend/.
 - 2025-10-15: Installed Docker, Node, pip; built and started docker-compose; verified /health and /db/health OK.
 - 2025-10-14: Completed database foundation (models, DB health route, debug create/read). Updated guide and .gitignore.
 - 2025-10-14: Initial scaffolding created (backend services, Celery, tests, Dockerfile, docker-compose, Next.js minimal app).

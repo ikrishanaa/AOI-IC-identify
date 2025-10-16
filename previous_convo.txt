@@ -328,3 +328,13 @@ Changes:
 •  Containerization footprint summarizes services and ports.
 
 Proceed to M4 (enqueue + status endpoints) and wire a simple frontend page to exercise them?
+2025-10-16 Environment setup and verification
+•  Installed Python tooling: python3-venv, python3-pip, build-essential, python3-dev, libexpat1-dev, zlib1g-dev, libpython3.11-dev.
+•  Created virtualenv `.venv`, upgraded pip to 25.2, installed backend requirements, ran `pytest backend/tests -q` (all tests passed).
+•  Added Docker apt repo and installed Docker CE stack: docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin. Enabled and started Docker service; added user to docker group.
+•  Verified: `docker --version` (28.5.1), `docker compose version` (v2.40.0).
+•  Built images: `sudo docker compose build` (all backend service images built successfully).
+•  Installed Node.js 20 via NodeSource and npm. Verified: `node -v` (v20.19.5), `npm -v` (10.8.2). Ran `npm install --prefix ./frontend`.
+•  Next commands to run stack/UI:
+  ◦  `sudo docker compose up -d`
+  ◦  `npm run dev --prefix ./frontend` (open http://localhost:3000)
