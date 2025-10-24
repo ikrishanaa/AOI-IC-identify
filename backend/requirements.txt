@@ -9,3 +9,5 @@ psycopg2-binary
 python-dotenv
 pytest
 httpx
+opencv-python-headless
+numpy

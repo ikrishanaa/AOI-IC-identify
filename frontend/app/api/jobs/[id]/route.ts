@@ -6,7 +6,9 @@ export async function GET(
   _req: Request,
   { params }: { params: { id: string } }
 ) {
-  const r = await fetch(`${INSPECTION_URL}/debug/jobs/${params.id}`);
+  const r = await fetch(`${INSPECTION_URL}/inspections/${params.id}`, {
+    cache: "no-store",
+  });
   const body = await r.json();
   return NextResponse.json(body, { status: r.status });
 }
