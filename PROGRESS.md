@@ -28,6 +28,7 @@ Next actions
 - M5: Implement /decide with basic weighted rules and unit tests.
 
 Changelog
+- 2025-10-24: Updated SETUP.md (service URLs, env vars, local run/testing, migration notes) and created latest_conversation.md; minor PROGRESS.md touch-ups.
 - 2025-10-16: Installed Python tooling (venv/pip/build-essential), created venv and installed deps; ran pytest (passing). Installed Docker CE + Compose plugin, enabled service; built all images via `docker compose build`. Installed Node.js 20 + npm and `npm install` in frontend/.
 - 2025-10-15: Installed Docker, Node, pip; built and started docker-compose; verified /health and /db/health OK.
 - 2025-10-14: Completed database foundation (models, DB health route, debug create/read). Updated guide and .gitignore.
