@@ -65,36 +65,36 @@ export default function NewInspectionPage() {
   }
 
   return (
-    <section className="max-w-2xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">New Batch Inspection</h1>
+    <section className="max-w-2xl mx-auto space-y-6">
+      <h1 className="text-3xl font-bold text-slate-800">New Batch Inspection</h1>
       
-      <form onSubmit={onSubmit} className="bg-white border border-gray-300 rounded-lg p-6 shadow-sm space-y-6">
+      <form onSubmit={onSubmit} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
         {/* Image Upload */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Component Image *
           </label>
           <input
             type="file"
             accept="image/*"
             onChange={handleFileChange}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-colors"
             required
           />
           {fileName && (
-            <p className="mt-2 text-sm text-green-600">✓ Selected: {fileName}</p>
+            <p className="mt-2 text-sm text-emerald-600 font-medium">✓ Selected: {fileName}</p>
           )}
         </div>
 
         {/* Component Type */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Component Type
           </label>
           <select
             value={componentType}
             onChange={(e) => setComponentType(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-slate-700"
           >
             <option value="IC">Integrated Circuit (IC)</option>
             <option value="PCB">Printed Circuit Board</option>
@@ -106,7 +106,7 @@ export default function NewInspectionPage() {
 
         {/* Reference ID */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Reference Component ID
           </label>
           <input
@@ -114,16 +114,16 @@ export default function NewInspectionPage() {
             value={referenceId}
             onChange={(e) => setReferenceId(e.target.value)}
             placeholder="REF-001"
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700"
           />
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-slate-500">
             Optional: Compare against a reference golden sample
           </p>
         </div>
 
         {/* Batch ID */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Batch ID (Optional)
           </label>
           <input
@@ -131,19 +131,19 @@ export default function NewInspectionPage() {
             value={batchId}
             onChange={(e) => setBatchId(e.target.value)}
             placeholder="BATCH-2025-001"
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700"
           />
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-slate-500">
             Group related inspections together
           </p>
         </div>
 
         {/* Submit Button */}
-        <div className="flex gap-3">
+        <div className="flex gap-3 pt-2">
           <button
             type="submit"
             disabled={submitting || !imageData}
-            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="flex-1 bg-blue-600 text-white py-2.5 px-4 rounded-lg font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors shadow-sm"
           >
             {submitting ? (
               <span className="flex items-center justify-center gap-2">
@@ -160,7 +160,7 @@ export default function NewInspectionPage() {
           <button
             type="button"
             onClick={() => router.push("/")}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            className="px-4 py-2.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium transition-colors"
           >
             Cancel
           </button>
@@ -168,9 +168,12 @@ export default function NewInspectionPage() {
       </form>
 
       {/* Info Box */}
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-semibold text-blue-900 mb-2">ℹ️ How it works</h3>
-        <ul className="text-sm text-blue-800 space-y-1">
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
+        <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+          <span className="text-xl">ℹ️</span>
+          How it works
+        </h3>
+        <ul className="text-sm text-blue-800 space-y-1.5">
           <li>• Your image is analyzed using 4 verification signals</li>
           <li>• OCR extracts text from the component</li>
           <li>• Logo detection identifies the manufacturer</li>
