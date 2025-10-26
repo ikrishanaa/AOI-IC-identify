@@ -1,5 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import StreamingResponse, PlainTextResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
 import asyncio
@@ -15,6 +16,15 @@ from .camera import CameraStream
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="Stream Ingestion & Processing Service", version="0.1.0")
+
+# CORS: allow frontend on 3000 to call camera endpoints
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Service URLs
 VERIFICATION_SERVICE_URL = "http://verification_service:8000"
