@@ -10,7 +10,7 @@ class InspectionJob(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     status = Column(String(32), nullable=False, default="pending")  # pending, processing, completed, failed
-    image_ref = Column(String(512), nullable=True)  # Path or object storage reference
+    image_ref = Column(Text, nullable=True)  # Path or object storage reference (can be large base64)
     component_type = Column(String(128), nullable=True)
     reference_id = Column(String(128), nullable=True)
     job_metadata = Column(JSON, nullable=True)
