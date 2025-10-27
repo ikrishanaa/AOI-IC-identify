@@ -61,3 +61,45 @@ class ReferenceComponent(Base):
     
     component_metadata = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class LiveInspectionRun(Base):
+    """Live inspection session tracking."""
+    __tablename__ = "live_inspection_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    camera_source = Column(String(256), nullable=True)
+    status = Column(String(32), nullable=False, default="active")  # active, completed, aborted
+    component_type = Column(String(128), nullable=True)
+    reference_id = Column(String(128), nullable=True)
+    run_metadata = Column(JSON, nullable=True)
+    
+    started_at = Column(DateTime(timezone=True), server_default=func.now())
+    ended_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Summary statistics
+    total_frames = Column(Integer, default=0)
+    frames_analyzed = Column(Integer, default=0)
+    pass_count = Column(Integer, default=0)
+    fail_count = Column(Integer, default=0)
+    review_count = Column(Integer, default=0)
+
+
+class LiveFrameResult(Base):
+    """Individual frame analysis results from live inspection."""
+    __tablename__ = "live_frame_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, ForeignKey("live_inspection_runs.id"), nullable=False, index=True)
+    frame_id = Column(Integer, nullable=False)
+    
+    # Frame analysis
+    verdict = Column(String(32), nullable=True)  # pass, fail, needs_review
+    confidence = Column(Float, nullable=True)
+    
+    # Verification signals
+    ocr_text = Column(String(512), nullable=True)
+    logo_manufacturer = Column(String(128), nullable=True)
+    analysis_data = Column(JSON, nullable=True)  # Full analysis details
+    
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())

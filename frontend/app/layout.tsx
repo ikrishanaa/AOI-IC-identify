@@ -31,6 +31,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 >
                   Live Camera
                 </Link>
+                <Link 
+                  href="/history" 
+                  className="px-4 py-2 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors font-medium"
+                >
+                  History
+                </Link>
               </nav>
             </div>
           </div>

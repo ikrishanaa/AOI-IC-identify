@@ -29,9 +29,12 @@ app.add_middleware(
 # Service URLs
 VERIFICATION_SERVICE_URL = "http://verification_service:8000"
 DECISION_ENGINE_URL = "http://decision_engine:8000"
+INSPECTION_SERVICE_URL = "http://inspection_service:8000"
 
 # Global camera instance
 camera: Optional[CameraStream] = None
+analysis_paused: bool = False
+current_run_id: Optional[int] = None
 
 
 class CameraStartRequest(BaseModel):
@@ -50,7 +53,7 @@ def health():
 
 
 @app.post("/camera/start")
-def start_camera(request: CameraStartRequest):
+async def start_camera(request: CameraStartRequest):
     """
     Start camera stream from provided URL.
     
@@ -59,7 +62,7 @@ def start_camera(request: CameraStartRequest):
     - HTTP MJPEG: http://192.168.1.100:8080/video
     - USB camera: 0, 1, 2...
     """
-    global camera
+    global camera, current_run_id
     
     # Stop existing camera if running
     if camera and camera.is_running():
@@ -74,36 +77,86 @@ def start_camera(request: CameraStartRequest):
         camera = None
         raise HTTPException(status_code=400, detail="Failed to start camera")
     
+    # Create live inspection run in database
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{INSPECTION_SERVICE_URL}/live/runs",
+                params={"camera_source": request.camera_url}
+            )
+            if response.status_code == 200:
+                data = response.json()
+                current_run_id = data.get("run_id")
+                logger.info(f"Created live inspection run: {current_run_id}")
+    except Exception as e:
+        logger.error(f"Failed to create live inspection run: {e}")
+        current_run_id = None
+    
     return {
         "status": "started",
         "source": request.camera_url,
+        "run_id": current_run_id,
         "stats": camera.get_stats()
     }
 
 
 @app.post("/camera/stop")
-def stop_camera():
+async def stop_camera():
     """Stop active camera stream."""
-    global camera
+    global camera, current_run_id
     
     if not camera:
         return {"status": "no_camera"}
     
+    stats = camera.get_stats()
+    total_frames = stats.get("frame_count", 0)
+    
     camera.stop()
     camera = None
     
+    # Complete live inspection run if exists
+    if current_run_id:
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{INSPECTION_SERVICE_URL}/live/runs/{current_run_id}/complete",
+                    params={"total_frames": total_frames}
+                )
+                logger.info(f"Completed live inspection run: {current_run_id}")
+        except Exception as e:
+            logger.error(f"Failed to complete live inspection run: {e}")
+        current_run_id = None
+    
     return {"status": "stopped"}
+
+
+@app.post("/camera/pause")
+def pause_analysis():
+    """Pause analysis without stopping camera."""
+    global analysis_paused
+    analysis_paused = True
+    return {"status": "paused"}
+
+
+@app.post("/camera/resume")
+def resume_analysis():
+    """Resume analysis."""
+    global analysis_paused
+    analysis_paused = False
+    return {"status": "resumed"}
 
 
 @app.get("/camera/stats")
 def get_camera_stats():
     """Get camera statistics."""
-    global camera
+    global camera, analysis_paused
     
     if not camera:
         return {"status": "no_camera"}
     
-    return camera.get_stats()
+    stats = camera.get_stats()
+    stats["analysis_paused"] = analysis_paused
+    return stats
 
 
 @app.get("/live/feed")
@@ -184,6 +237,8 @@ async def ws_live_analysis(websocket: WebSocket):
         })
         
         frame_id = 0
+        frames_since_analysis = 0
+        ANALYSIS_EVERY_N_FRAMES = 15  # Process every 15th frame (~2 FPS at 30 FPS camera)
         
         while camera and camera.is_running():
             # Check for incoming messages (capture requests, etc.)
@@ -212,6 +267,19 @@ async def ws_live_analysis(websocket: WebSocket):
                 continue
             
             frame_id += 1
+            frames_since_analysis += 1
+            
+            # Skip analysis if paused
+            if analysis_paused:
+                await asyncio.sleep(0.05)
+                continue
+            
+            # Frame throttling: only analyze every Nth frame
+            if frames_since_analysis < ANALYSIS_EVERY_N_FRAMES:
+                await asyncio.sleep(0.01)
+                continue
+            
+            frames_since_analysis = 0
             
             # Encode frame to base64 for analysis
             ret, buffer = cv2.imencode('.jpg', frame)
@@ -224,6 +292,24 @@ async def ws_live_analysis(websocket: WebSocket):
             # Perform analysis
             analysis = await analyze_frame_async(frame_data, frame_id)
             
+            # Store analysis result in database if we have a run_id
+            if current_run_id and analysis.verdict:
+                try:
+                    async with httpx.AsyncClient(timeout=2.0) as client:
+                        await client.post(
+                            f"{INSPECTION_SERVICE_URL}/live/runs/{current_run_id}/frames",
+                            params={
+                                "frame_id": frame_id,
+                                "verdict": analysis.verdict,
+                                "confidence": analysis.confidence,
+                                "ocr_text": analysis.ocr_text,
+                                "logo_manufacturer": analysis.logo_manufacturer,
+                            },
+                            json={"analysis_data": analysis.model_dump()}
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to store frame result: {e}")
+            
             # Send results to client
             await websocket.send_json({
                 "type": "analysis",
@@ -231,9 +317,6 @@ async def ws_live_analysis(websocket: WebSocket):
             })
             
             logger.debug(f"Sent analysis for frame {frame_id}")
-            
-            # Small delay to prevent overwhelming client (adjust based on needs)
-            await asyncio.sleep(0.1)
     
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected by client")

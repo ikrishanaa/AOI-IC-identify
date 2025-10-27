@@ -21,6 +21,7 @@ type CameraStats = {
   frame_count?: number;
   error_count?: number;
   last_frame_time?: string;
+  analysis_paused?: boolean;
 };
 
 export default function LivePage() {
@@ -85,6 +86,26 @@ export default function LivePage() {
     }
   }, []);
 
+  // Pause analysis
+  const pauseAnalysis = useCallback(async () => {
+    try {
+      await fetch("http://localhost:8002/camera/pause", { method: "POST" });
+      await fetchStats();
+    } catch (err: any) {
+      setError(`Failed to pause: ${err.message}`);
+    }
+  }, [fetchStats]);
+
+  // Resume analysis
+  const resumeAnalysis = useCallback(async () => {
+    try {
+      await fetch("http://localhost:8002/camera/resume", { method: "POST" });
+      await fetchStats();
+    } catch (err: any) {
+      setError(`Failed to resume: ${err.message}`);
+    }
+  }, [fetchStats]);
+
   // Stop camera
   const stopCamera = useCallback(async () => {
     try {
@@ -124,21 +145,40 @@ export default function LivePage() {
           <h1 className="text-3xl font-bold text-slate-800">Live Camera Analysis</h1>
           <p className="text-slate-600 mt-1">Real-time component inspection</p>
         </div>
-        {cameraStats?.running ? (
-          <button
-            onClick={stopCamera}
-            className="px-4 py-2 bg-rose-600 text-white rounded-lg font-semibold hover:bg-rose-700 transition-colors"
-          >
-            Stop Camera
-          </button>
-        ) : (
-          <button
-            onClick={() => router.push("/live/setup")}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-          >
-            Setup Camera
-          </button>
-        )}
+        <div className="flex gap-3">
+          {cameraStats?.running ? (
+            <>
+              {cameraStats.analysis_paused ? (
+                <button
+                  onClick={resumeAnalysis}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors"
+                >
+                  ▶ Resume
+                </button>
+              ) : (
+                <button
+                  onClick={pauseAnalysis}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 transition-colors"
+                >
+                  ⏸ Pause
+                </button>
+              )}
+              <button
+                onClick={stopCamera}
+                className="px-4 py-2 bg-rose-600 text-white rounded-lg font-semibold hover:bg-rose-700 transition-colors"
+              >
+                ⏹ Stop
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => router.push("/live/setup")}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+            >
+              Setup Camera
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Error Display */}
