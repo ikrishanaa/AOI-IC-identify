@@ -284,7 +284,7 @@ async def ws_live_analysis(websocket: WebSocket):
        - Push results to client
     4. Handle capture events from client
     """
-    global camera
+    global camera, analysis_mode, sampling_every_n_frames, store_snapshots, delete_snapshot_after_analysis, current_run_id, awaiting_new_ic
     await websocket.accept()
     logger.info("WebSocket connection established")
     
@@ -456,8 +456,7 @@ async def quick_ocr_key(frame_data: str) -> Optional[str]:
             data = resp.json()
             return normalize_ic_key(data.get("ocr", {}).get("text"))
     except Exception as e:
-        logger.debug(f"quick_ocr_key error: {e}
-")
+        logger.debug(f"quick_ocr_key error: {e}")
         return None
 
 
