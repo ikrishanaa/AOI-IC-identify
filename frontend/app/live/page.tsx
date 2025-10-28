@@ -18,7 +18,11 @@ type AnalysisResult = {
 type CameraStats = {
   running: boolean;
   source?: string;
-  frame_count?: number;
+  frame_count?: number; // captured frames
+  frames_analyzed?: number; // analyzed frames
+  fps?: number | null;
+  sampling_every_n_frames?: number;
+  analysis_mode?: "conveyor" | "single";
   error_count?: number;
   last_frame_time?: string;
   analysis_paused?: boolean;
@@ -30,6 +34,7 @@ export default function LivePage() {
   const [wsStatus, setWsStatus] = useState<"idle" | "connecting" | "open" | "closed" | "error">("idle");
   const [latestResult, setLatestResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string>("");
+  const [config, setConfig] = useState<{ analysis_mode: "conveyor" | "single"; store_snapshots: boolean; delete_after: boolean; sampling_every_n_frames: number } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const statsIntervalRef = useRef<any>(null);
 
@@ -38,10 +43,15 @@ export default function LivePage() {
   // Fetch camera stats
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch("http://localhost:8002/camera/stats");
-      const data = await res.json();
-      setCameraStats(data);
-      if (!data.running) {
+      const [statsRes, cfgRes] = await Promise.all([
+        fetch("http://localhost:8002/camera/stats"),
+        fetch("http://localhost:8002/analysis/config"),
+      ]);
+      const stats = await statsRes.json();
+      const cfg = await cfgRes.json();
+      setCameraStats(stats);
+      setConfig(cfg);
+      if (!stats.running) {
         setError("Camera not running");
       } else {
         setError("");
@@ -66,9 +76,9 @@ export default function LivePage() {
       
       ws.onmessage = (e) => {
         try {
-          const data = JSON.parse(e.data);
-          if (data.verdict) {
-            setLatestResult(data);
+          const msg = JSON.parse(e.data);
+          if (msg.type === "analysis" && msg.data) {
+            setLatestResult(msg.data);
           }
         } catch (err) {
           console.error("Failed to parse WebSocket message", err);
@@ -85,6 +95,46 @@ export default function LivePage() {
       setError("Failed to connect WebSocket");
     }
   }, []);
+
+  // Update analysis config
+  const setMode = useCallback(async (mode: "conveyor" | "single") => {
+    try {
+      await fetch("http://localhost:8002/analysis/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ analysis_mode: mode })
+      });
+      await fetchStats();
+    } catch (err: any) {
+      setError(`Failed to update mode: ${err.message}`);
+    }
+  }, [fetchStats]);
+
+  const setSampling = useCallback(async (n: 30 | 60) => {
+    try {
+      await fetch("http://localhost:8002/analysis/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ analysis_mode: (config?.analysis_mode || "conveyor"), sampling_every_n_frames: n })
+      });
+      await fetchStats();
+    } catch (err: any) {
+      setError(`Failed to set sampling: ${err.message}`);
+    }
+  }, [config?.analysis_mode, fetchStats]);
+
+  const toggleSnapshots = useCallback(async () => {
+    try {
+      await fetch("http://localhost:8002/analysis/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ analysis_mode: (config?.analysis_mode || "conveyor"), store_snapshots: !config?.store_snapshots })
+      });
+      await fetchStats();
+    } catch (err: any) {
+      setError(`Failed to toggle snapshots: ${err.message}`);
+    }
+  }, [config, fetchStats]);
 
   // Pause analysis
   const pauseAnalysis = useCallback(async () => {
@@ -145,7 +195,23 @@ export default function LivePage() {
           <h1 className="text-3xl font-bold text-slate-800">Live Camera Analysis</h1>
           <p className="text-slate-600 mt-1">Real-time component inspection</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center">
+          {/* Mode selector */}
+          <div className="hidden md:flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+            <button
+              onClick={() => setMode("conveyor")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium ${config?.analysis_mode === "conveyor" ? "bg-white shadow" : "text-slate-600 hover:bg-slate-200"}`}
+            >
+              Conveyer-like
+            </button>
+            <button
+              onClick={() => setMode("single")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium ${config?.analysis_mode === "single" ? "bg-white shadow" : "text-slate-600 hover:bg-slate-200"}`}
+            >
+              1 by 1
+            </button>
+          </div>
+
           {cameraStats?.running ? (
             <>
               {cameraStats.analysis_paused ? (
@@ -219,8 +285,12 @@ export default function LivePage() {
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-slate-600 font-mono">
-                  {cameraStats.frame_count || 0} frames
+                <div className="text-xs text-slate-600 font-mono flex items-center gap-3">
+                  <span>Captured: {cameraStats.frame_count || 0}</span>
+                  <span>Analyzed: {cameraStats.frames_analyzed || 0}</span>
+                  {typeof cameraStats.fps === "number" && (
+                    <span>FPS: {cameraStats.fps}</span>
+                  )}
                 </div>
               </div>
               <div className="bg-slate-900 flex items-center justify-center" style={{ minHeight: "400px" }}>
@@ -236,12 +306,16 @@ export default function LivePage() {
             {/* Camera Stats */}
             <div className="mt-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
               <h3 className="font-semibold text-slate-800 mb-3">Camera Status</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                 <div>
                   <span className="text-slate-500">Source</span>
                   <p className="font-mono font-medium text-slate-800 truncate">
                     {cameraStats.source || "Unknown"}
                   </p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Mode</span>
+                  <p className="font-semibold text-slate-800">{config?.analysis_mode === "single" ? "1 by 1" : "Conveyer-like"}</p>
                 </div>
                 <div>
                   <span className="text-slate-500">WebSocket</span>
@@ -253,8 +327,12 @@ export default function LivePage() {
                   </p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Frames</span>
-                  <p className="font-semibold text-slate-800">{cameraStats.frame_count || 0}</p>
+                  <span className="text-slate-500">Analyzed</span>
+                  <p className="font-semibold text-slate-800">{cameraStats.frames_analyzed || 0}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Sampling</span>
+                  <p className="font-semibold text-slate-800">1 in {cameraStats.sampling_every_n_frames || 30}</p>
                 </div>
                 <div>
                   <span className="text-slate-500">Errors</span>
@@ -269,6 +347,26 @@ export default function LivePage() {
           {/* Analysis Results - 1/3 width */}
           <div className="lg:col-span-1">
             <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm sticky top-6">
+              {/* Conveyor controls */}
+              {config?.analysis_mode === "conveyor" && (
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="text-sm text-slate-700 font-medium">Snapshots</div>
+                  <button
+                    onClick={toggleSnapshots}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium ${config?.store_snapshots ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700"}`}
+                  >
+                    {config?.store_snapshots ? "On" : "Off"}
+                  </button>
+                </div>
+              )}
+
+              {config?.analysis_mode === "conveyor" && (
+                <div className="mb-4 flex items-center gap-2">
+                  <div className="text-sm text-slate-700 font-medium">Sampling:</div>
+                  <button onClick={() => setSampling(30)} className={`px-3 py-1.5 rounded-md text-sm font-medium ${cameraStats?.sampling_every_n_frames === 30 ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-700"}`}>1 in 30</button>
+                  <button onClick={() => setSampling(60)} className={`px-3 py-1.5 rounded-md text-sm font-medium ${cameraStats?.sampling_every_n_frames === 60 ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-700"}`}>1 in 60</button>
+                </div>
+              )}
               <h3 className="font-semibold text-slate-800 mb-4">Latest Analysis</h3>
               
               {!latestResult && (

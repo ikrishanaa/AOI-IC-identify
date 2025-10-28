@@ -36,6 +36,7 @@ export default function LiveInspectionDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showFrames, setShowFrames] = useState(false);
+  const [groupByIC, setGroupByIC] = useState(true);
 
   useEffect(() => {
     if (runId) {
@@ -203,22 +204,65 @@ export default function LiveInspectionDetailPage() {
         </div>
       </div>
 
-      {/* Frame Results */}
+      {/* Frame/IC Results */}
       {details.frames && details.frames.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-slate-800">
-              Frame Analysis Results ({details.frames.length})
+              {groupByIC ? "IC-wise Results (by OCR)" : `Frame Analysis Results (${details.frames.length})`}
             </h2>
-            <button
-              onClick={() => setShowFrames(!showFrames)}
-              className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors"
-            >
-              {showFrames ? "Hide Frames" : "Show All Frames"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setGroupByIC(!groupByIC)}
+                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors"
+              >
+                {groupByIC ? "Show Frames" : "Group by OCR"}
+              </button>
+              <button
+                onClick={() => setShowFrames(!showFrames)}
+                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors"
+              >
+                {showFrames ? "Hide" : "Expand"}
+              </button>
+            </div>
           </div>
 
-          {showFrames && (
+          {/* Grouped view */}
+          {groupByIC ? (
+            <div className="space-y-3">
+              {Object.entries(
+                details.frames.reduce((acc: Record<string, FrameResult[]>, f) => {
+                  const key = (f.ocr_text || "(no OCR)").toUpperCase();
+                  acc[key] = acc[key] || [];
+                  acc[key].push(f);
+                  return acc;
+                }, {})
+              ).map(([key, group]) => (
+                <div key={key} className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="font-mono font-bold text-slate-800">{key}</div>
+                    <div className="text-xs text-slate-500">{group.length} frame(s)</div>
+                  </div>
+                  {showFrames && (
+                    <div className="mt-3 grid gap-2">
+                      {group.map((frame) => (
+                        <div key={frame.frame_id} className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-slate-500">Frame #{frame.frame_id}</span>
+                              <VerdictBadge verdict={frame.verdict} confidence={frame.confidence} className="text-xs" />
+                            </div>
+                            <div className="text-xs text-slate-500">{formatDate(frame.timestamp)}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Frame list view
             <div className="space-y-2 max-h-[600px] overflow-y-auto">
               {details.frames.map((frame) => (
                 <div

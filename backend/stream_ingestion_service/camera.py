@@ -38,6 +38,7 @@ class CameraStream:
         self.frame_count = 0
         self.error_count = 0
         self.max_errors = 10  # Stop after 10 consecutive errors
+        self.fps_estimate = 0.0  # Exponential moving average of FPS
         
     def start(self) -> bool:
         """
@@ -114,8 +115,16 @@ class CameraStream:
                 
                 # Reset error count on successful read
                 self.error_count = 0
+                now = time.time()
+                # FPS estimation
+                if self.last_frame_time:
+                    dt = now - self.last_frame_time
+                    if dt > 0:
+                        inst_fps = 1.0 / dt
+                        # EMA smoothing
+                        self.fps_estimate = (0.9 * self.fps_estimate) + (0.1 * inst_fps) if self.fps_estimate else inst_fps
                 self.frame_count += 1
-                self.last_frame_time = time.time()
+                self.last_frame_time = now
                 
                 # Add to queue (discard oldest if full)
                 if self.frame_queue.full():
@@ -203,4 +212,5 @@ class CameraStream:
             "max_queue_size": self.max_queue_size,
             "error_count": self.error_count,
             "last_frame_time": self.last_frame_time,
+            "fps": round(self.fps_estimate, 2) if self.fps_estimate else None,
         }
