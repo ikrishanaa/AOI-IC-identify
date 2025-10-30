@@ -34,12 +34,8 @@ export default function HistoryPage() {
     setLoading(true);
     setError("");
     try {
-      const url = new URL("http://localhost:8001/history");
-      if (filter !== "all") {
-        url.searchParams.append("inspection_type", filter);
-      }
-      
-      const res = await fetch(url.toString());
+      const qs = filter !== "all" ? `?inspection_type=${filter}` : "";
+      const res = await fetch(`/api/history${qs}`, { cache: "no-store" });
       const data = await res.json();
       setHistory(data.history || []);
     } catch (err: any) {
@@ -72,7 +68,7 @@ export default function HistoryPage() {
 
   const viewDetails = (item: HistoryItem) => {
     if (item.type === "batch") {
-      router.push(`/batch/results/${item.id}`);
+      router.push(`/inspections/${item.id}`);
     } else {
       router.push(`/history/live/${item.id}`);
     }
