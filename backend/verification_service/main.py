@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException
 import random
 import logging
 import time
+import hashlib
+import base64
 
 from shared.models import (
     VerificationRequest,
@@ -66,6 +68,24 @@ def verify_component(request: VerificationRequest) -> VerificationResponse:
     return response
 
 
+def _content_bytes(image_data: str) -> bytes:
+    """Extract raw bytes from possible data URL or plain base64 string; fallback to utf-8 bytes."""
+    try:
+        if image_data.startswith("data:") and "," in image_data:
+            b64 = image_data.split(",", 1)[1]
+            return base64.b64decode(b64, validate=False)
+        # try base64 decode directly
+        return base64.b64decode(image_data, validate=False)
+    except Exception:
+        return image_data.encode("utf-8", errors="ignore")
+
+
+def _stable_index(payload: str, n: int) -> int:
+    """Stable index in [0,n) based on SHA-256 of content bytes."""
+    b = _content_bytes(payload)
+    h = hashlib.sha256(b).digest()
+    return int.from_bytes(h[:4], "big") % n if n > 0 else 0
+
 def perform_ocr_mock(image_data: str) -> OCRResult:
     """
     Mock OCR using Tesseract.
@@ -76,12 +96,12 @@ def perform_ocr_mock(image_data: str) -> OCRResult:
     - Detect text ROI with EAST detector
     - Run Tesseract OCR on ROI
     """
-    # Deterministic mock based on image hash
-    hash_val = hash(image_data) % len(MOCK_PART_NUMBERS)
-    text = MOCK_PART_NUMBERS[hash_val]
+    # Deterministic but content-sensitive mock
+    idx = _stable_index(image_data, len(MOCK_PART_NUMBERS))
+    text = MOCK_PART_NUMBERS[idx]
     
     # Simulate realistic confidence (0.75-0.95)
-    confidence = 0.75 + (hash_val / len(MOCK_PART_NUMBERS)) * 0.20
+    confidence = 0.75 + (idx / max(1, len(MOCK_PART_NUMBERS)-1)) * 0.20
     
     return OCRResult(
         text=text,
@@ -99,11 +119,11 @@ def perform_logo_detection_mock(image_data: str) -> LogoResult:
     - Send to Google Cloud Vision API or AWS Rekognition
     - OR run custom CNN trained on manufacturer logos
     """
-    hash_val = hash(image_data) % len(MOCK_MANUFACTURERS)
-    manufacturer = MOCK_MANUFACTURERS[hash_val]
+    idx = _stable_index(image_data, len(MOCK_MANUFACTURERS))
+    manufacturer = MOCK_MANUFACTURERS[idx]
     
     # Simulate realistic confidence (0.70-0.95)
-    confidence = 0.70 + (hash_val / len(MOCK_MANUFACTURERS)) * 0.25
+    confidence = 0.70 + (idx / max(1, len(MOCK_MANUFACTURERS)-1)) * 0.25
     
     return LogoResult(
         manufacturer=manufacturer,
@@ -121,12 +141,15 @@ def perform_visual_signature_mock(image_data: str) -> VisualSignatureResult:
     - Generate embedding vector
     - Compare with golden sample embeddings using cosine similarity
     """
-    # Simulate realistic similarity (0.65-0.90)
-    hash_val = abs(hash(image_data))
-    similarity = 0.65 + (hash_val % 100) / 100 * 0.25
+    b = _content_bytes(image_data)
+    # Simulate realistic similarity (0.65-0.90) based on content bytes
+    h = hashlib.sha256(b).digest()
+    similarity = 0.65 + (h[0] / 255.0) * 0.25
     
-    # Mock embedding (128-dim vector)
-    embedding = [random.random() for _ in range(128)]
+    # Mock embedding (128-dim vector) seeded for determinism per content
+    seed = int.from_bytes(h[:4], "big")
+    rnd = random.Random(seed)
+    embedding = [rnd.random() for _ in range(128)]
     
     return VisualSignatureResult(
         similarity=similarity,
@@ -145,14 +168,14 @@ def perform_anomaly_detection_mock(image_data: str) -> AnomalyResult:
     - High error = anomaly (tampered/fake)
     """
     # Simulate realistic anomaly scores (mostly low 0.05-0.20, occasionally high 0.30-0.60)
-    hash_val = abs(hash(image_data))
-    
-    if hash_val % 7 == 0:  # ~14% anomalous
-        score = 0.30 + (hash_val % 100) / 100 * 0.30  # 0.30-0.60
-        is_anomalous = True
+    b = _content_bytes(image_data)
+    h = hashlib.sha256(b).digest()
+    # Use first byte to decide anomaly roughly ~1/7 chance
+    is_anomalous = (h[0] % 7) == 0
+    if is_anomalous:
+        score = 0.30 + (h[1] / 255.0) * 0.30  # 0.30-0.60
     else:
-        score = 0.05 + (hash_val % 100) / 100 * 0.15  # 0.05-0.20
-        is_anomalous = False
+        score = 0.05 + (h[2] / 255.0) * 0.15  # 0.05-0.20
     
     return AnomalyResult(
         score=score,

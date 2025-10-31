@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
 from celery import Celery
 import logging
 from typing import Optional
@@ -12,6 +14,15 @@ from .models import InspectionJob, InspectionResult, LiveInspectionRun, LiveFram
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="Inspection Management Service", version="0.1.0")
+
+# CORS (dev): allow frontend on localhost:3000
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Celery client for task publishing
 settings = get_settings()
